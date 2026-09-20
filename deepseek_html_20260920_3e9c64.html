@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Gerador — Sistema Licitações Palmeiras/BA</title>
+<style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+        font-family:'Segoe UI', Tahoma, sans-serif;
+        background: linear-gradient(135deg, #0a0e1a 0%, #1a1f35 50%, #16213e 100%);
+        color:#e0e0e0; min-height:100vh; padding:40px 20px;
+        display:flex; align-items:center; justify-content:center;
+    }
+    .card {
+        max-width:680px; width:100%;
+        background: rgba(255,255,255,0.05);
+        backdrop-filter: blur(20px);
+        border:1px solid rgba(255,255,255,0.1);
+        border-radius:20px; padding:36px 32px;
+    }
+    h1 { font-size:22px; margin-bottom:8px; color:#fff; }
+    .sub { color:rgba(255,255,255,0.5); font-size:13.5px; margin-bottom:24px; }
+    .box {
+        background: rgba(0,212,255,0.08);
+        border:1px solid rgba(0,212,255,0.3);
+        border-radius:12px; padding:16px; margin-bottom:20px;
+        font-size:13.5px; line-height:1.7;
+    }
+    .box strong { color:#00d4ff; }
+    ul { margin:12px 0 12px 20px; }
+    li { margin-bottom:6px; }
+    code { background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; font-size:12.5px; }
+    button {
+        width:100%; padding:16px;
+        background: linear-gradient(135deg, #00d4ff, #7b2ff7);
+        border:none; border-radius:12px; color:#fff;
+        font-weight:700; font-size:16px; cursor:pointer;
+        transition: transform 0.15s;
+        margin-bottom:12px;
+    }
+    button:hover { transform: translateY(-2px); }
+    button:disabled { opacity:0.5; cursor:not-allowed; }
+    #log { margin-top:16px; font-size:13px; line-height:1.8; padding:12px; background:rgba(0,0,0,0.3); border-radius:10px; display:none; }
+    #log.visivel { display:block; }
+    .ok { color:#7dd97f; }
+    .err { color:#ff8a80; }
+    .info { color:#7fe3ff; }
+</style>
+</head>
+<body>
+<div class="card">
+    <h1>📦 Gerador do Pacote</h1>
+    <p class="sub">Sistema de Licitações — Palmeiras/BA · Fase 1 + Fase 2</p>
+
+    <div class="box">
+        <strong>Este botão baixa 4 arquivos separados:</strong>
+        <ul>
+            <li><code>index.html</code> — sistema completo</li>
+            <li><code>schema.sql</code> — banco (Fase 1 + Fase 2)</li>
+            <li><code>README.md</code> — manual de instalação</li>
+            <li><code>PROMPT-MESTRE.md</code> — para continuar a evolução</li>
+        </ul>
+        Depois, se quiser um .zip, é só compactar a pasta no seu sistema.
+    </div>
+
+    <button id="btnGerar">⬇️ Baixar os 4 arquivos</button>
+    <button id="btnGerarZip" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);">
+        📦 Baixar tudo num único .zip (via CDN)
+    </button>
+
+    <div id="log"></div>
+</div>
+
+<script>
+// ============================================================
+// LOG
+// ============================================================
+const logEl = document.getElementById('log');
+function log(msg, tipo) {
+    logEl.classList.add('visivel');
+    const linha = document.createElement('div');
+    linha.className = tipo || 'info';
+    linha.textContent = msg;
+    logEl.appendChild(linha);
+}
+function limparLog() { logEl.innerHTML = ''; logEl.classList.remove('visivel'); }
+
+// ============================================================
+// DOWNLOAD DE ARQUIVO ÚNICO (API nativa, sem CDN)
+// ============================================================
+function baixarArquivo(nome, conteudo, mime) {
+    try {
+        const blob = new Blob([conteudo], { type: mime || 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nome;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function() {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 1000);
+        return true;
+    } catch (e) {
+        log('❌ Falha ao baixar ' + nome + ': ' + e.message, 'err');
+        return false;
+    }
+}
+
+// ============================================================
+// CONTEÚDO DOS ARQUIVOS
+// ============================================================
+
+// Nota: para evitar o problema do </script> dentro de template string,
+// o conteúdo do index.html é montado em partes e não contém scripts inline
+// problemáticos. Ele aponta para CDNs via <script src> que é seguro.
+
+const PARTE_HEAD = [
+'<!DOCTYPE html>',
+'<html lang="pt-BR">',
+'<head>',
+'<meta charset="UTF-8">',
+'<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+'<title>Sistema de Licitações — Palmeiras/BA</title>',
+'<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></' + 'script>',
+'<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">',
+'<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></' + 'script>',
+'<script src="https://cdn.jsdelivr.net/npm/pizzip@3.1.6/dist/pizzip.min.js"></' + 'script>',
+'<script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.44.0/js/docxtemplater.js"></' + 'script>',
+'<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></' + 'script>',
+'<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></' + 'script>',
+'<style>',
+'*{margin:0;padding:0;box-sizing:border-box}',
+'body{font-family:"Segoe UI",Tahoma,sans-serif;background:linear-gradient(135deg,#0a0e1a,#1a1f35 50%,#16213e);min-height:100vh;color:#e0e0e0;padding:20px}',
+'#telaLogin{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0a0e1a,#1a1f35 50%,#16213e);padding:20px}',
+'#telaLogin.oculta{display:none}',
+'.card-login{width:100%;max-width:420px;background:rgba(255,255,255,.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:36px 32px}',
+'.card-login .brand{text-align:center;margin-bottom:28px}',
+'.card-login h1{font-size:20px;color:#fff;margin-top:12px}',
+'.card-login p{font-size:13px;color:rgba(255,255,255,.55);margin-top:4px}',
+'.brasao{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#00d4ff,#7b2ff7);display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:28px;color:#fff;font-weight:800}',
+'.field{margin-bottom:16px}',
+'.field label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.6);font-weight:600;margin-bottom:6px}',
+'.field input{width:100%;padding:12px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:#fff;font-size:14px;outline:none}',
+'.field input:focus{border-color:#00d4ff}',
+'.senha-wrap{position:relative}',
+'.senha-wrap button{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;font-size:14px;padding:4px 8px}',
+'.row{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:20px}',
+'.row a{color:#00d4ff;text-decoration:none}',
+'.row label{display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.6);cursor:pointer}',
+'.btn-primario{width:100%;padding:13px 20px;border:none;border-radius:12px;background:linear-gradient(135deg,#00d4ff,#7b2ff7);color:#fff;font-weight:700;font-size:15px;cursor:pointer}',
+'.btn-primario:disabled{opacity:.5;cursor:not-allowed}',
+'.status-msg{margin-top:16px;padding:10px 14px;border-radius:10px;font-size:13px;display:none}',
+'.status-msg.show{display:block}',
+'.status-msg.err{background:rgba(244,67,54,.15);color:#ff8a80;border:1px solid rgba(244,67,54,.3)}',
+'.status-msg.ok{background:rgba(76,175,80,.15);color:#7dd97f;border:1px solid rgba(76,175,80,.3)}',
+'.status-msg.info{background:rgba(0,212,255,.12);color:#7fe3ff;border:1px solid rgba(0,212,255,.3)}',
+'.lgpd{margin-top:22px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);font-size:11.5px;color:rgba(255,255,255,.4);line-height:1.6}',
+'#shell{display:none}',
+'#shell.ativo{display:block}',
+'.topo{position:fixed;top:0;left:0;right:0;height:64px;z-index:50;background:rgba(255,255,255,.05);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;padding:0 20px;gap:16px}',
+'.topo-marca{font-weight:800;font-size:17px;color:#fff;display:flex;align-items:center;gap:10px}',
+'.topo-marca .brasaozinho{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#00d4ff,#7b2ff7);display:flex;align-items:center;justify-content:center;font-weight:800}',
+'.topo-info{margin-left:auto;display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:13px}',
+'.topo-usuario{display:flex;flex-direction:column;align-items:flex-end;line-height:1.3}',
+'.topo-usuario strong{color:#fff;font-size:13.5px}',
+'.topo-usuario span{color:rgba(255,255,255,.5);font-size:11.5px}',
+'.btn-sair{background:rgba(244,67,54,.15);border:1px solid rgba(244,67,54,.3);color:#ff8a80;padding:8px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600}',
+'.btn-menu-mobile{display:none;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#fff;width:38px;height:38px;border-radius:10px;align-items:center;justify-content:center;cursor:pointer;font-size:18px}',
+'.layout{padding-top:64px}',
+'.layout-2col{display:flex;min-height:calc(100vh - 64px)}',
+'.menu{width:260px;flex-shrink:0;background:rgba(255,255,255,.03);border-right:1px solid rgba(255,255,255,.06);padding:20px 12px;height:calc(100vh - 64px);overflow-y:auto;position:sticky;top:64px}',
+'.menu-secao{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.35);font-weight:700;padding:14px 12px 6px}',
+'.menu-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:rgba(255,255,255,.7);text-decoration:none;font-size:13.5px;cursor:pointer}',
+'.menu-item:hover{background:rgba(255,255,255,.06);color:#fff}',
+'.menu-item.ativo{background:linear-gradient(135deg,rgba(0,212,255,.15),rgba(123,47,247,.15));color:#00d4ff;font-weight:600;border:1px solid rgba(0,212,255,.2)}',
+'.conteudo{flex:1;padding:24px 28px;min-width:0}',
+'.panel{background:rgba(255,255,255,.05);backdrop-filter:blur(15px);border-radius:16px;padding:22px;border:1px solid rgba(255,255,255,.08);margin-bottom:20px}',
+'.panel h2{font-size:18px;margin-bottom:6px}',
+'.btn-action{padding:12px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,#00d4ff,#7b2ff7);color:#fff;font-weight:700;font-size:14px;cursor:pointer}',
+'.btn-action.btn-secondary{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)}',
+'.faixa-aviso{background:rgba(255,193,7,.12);border:1px solid rgba(255,193,7,.3);color:#ffd54f;padding:10px 16px;border-radius:10px;font-size:13px;margin-bottom:16px}',
+'.data-table{width:100%;border-collapse:collapse;font-size:13px}',
+'.data-table th,.data-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.06);text-align:left}',
+'.data-table th{color:rgba(255,255,255,.5);font-size:11px;text-transform:uppercase}',
+'@media(max-width:768px){.menu{position:fixed;left:-280px;top:64px;bottom:0;z-index:40;transition:left .3s;width:260px;background:rgba(20,25,50,.98)}.menu.aberto{left:0}.btn-menu-mobile{display:flex}.topo-usuario span{display:none}}',
+'</style>',
+'</head>',
+'<body>'
+].join('\n');
+
+const PARTE_BODY = [
+'<div id="telaLogin">',
+'    <div class="card-login">',
+'        <div class="brand">',
+'            <div class="brasao">P</div>',
+'            <h1>Sistema de Licitações</h1>',
+'            <p>Prefeitura Municipal de Palmeiras / BA</p>',
+'        </div>',
+'        <form id="formLogin">',
+'            <div class="field">',
+'                <label for="loginEmail">E-mail institucional</label>',
+'                <input type="email" id="loginEmail" required placeholder="nome@palmeiras.ba.gov.br">',
+'            </div>',
+'            <div class="field">',
+'                <label for="loginSenha">Senha</label>',
+'                <div class="senha-wrap">',
+'                    <input type="password" id="loginSenha" required minlength="10" placeholder="Mínimo 10 caracteres">',
+'                    <button type="button" id="btnVerSenha">👁</button>',
+'                </div>',
+'            </div>',
+'            <div class="row">',
+'                <label><input type="checkbox" id="loginLembrar"> Lembrar acesso</label>',
+'                <a href="#" id="linkRecuperar">Esqueci a senha</a>',
+'            </div>',
+'            <button type="submit" class="btn-primario" id="btnEntrar">Entrar</button>',
+'            <div class="status-msg" id="loginStatus"></div>',
+'        </form>',
+'        <div class="lgpd">',
+'            <strong>Aviso LGPD:</strong> registramos data, hora, usuário e IP de cada acesso e ação, para cumprimento de obrigação legal e segurança da informação municipal (Lei 13.709/2018).',
+'        </div>',
+'    </div>',
+'</div>',
+'',
+'<div id="shell">',
+'    <header class="topo">',
+'        <button class="btn-menu-mobile" id="btnMenuMobile"><i class="fas fa-bars"></i></button>',
+'        <div class="topo-marca"><div class="brasaozinho">P</div><span>Licitações — Palmeiras/BA</span></div>',
+'        <div class="topo-info">',
+'            <div class="topo-usuario"><strong id="topoNome">—</strong><span id="topoCargo">—</span></div>',
+'            <div class="topo-usuario"><span id="topoSecretaria">—</span><span id="topoSetor">—</span></div>',
+'            <button class="btn-sair" id="btnSair"><i class="fas fa-sign-out-alt"></i> Sair</button>',
+'        </div>',
+'    </header>',
+'    <div class="layout">',
+'        <div class="layout-2col">',
+'            <aside class="menu" id="menuLateral"></aside>',
+'            <main class="conteudo" id="conteudoPrincipal">',
+'                <h1 id="paginaTitulo" style="font-size:22px;margin-bottom:6px;color:#fff">Início</h1>',
+'                <p id="paginaSubtitulo" style="color:rgba(255,255,255,.5);font-size:13.5px;margin-bottom:20px">Bem-vindo ao sistema.</p>',
+'                <div id="faixaModoLocal"></div>',
+'                <div class="panel">',
+'                    <h3 style="font-size:15px;margin-bottom:12px"><i class="fas fa-circle-info" style="color:#00d4ff"></i> Sistema instalado</h3>',
+'                    <p style="font-size:13.5px;color:rgba(255,255,255,.7);line-height:1.7">Você está logado. Autenticação real, RBAC, auditoria e banco central (Supabase) prontos.</p>',
+'                    <p style="font-size:13.5px;color:rgba(255,255,255,.7);margin-top:12px"><strong>Primeiro passo:</strong> rode no console (F12): <code style="background:rgba(255,255,255,.1);padding:2px 6px;border-radius:4px">Migrador280.exibirPainelMigracao()</code></p>',
+'                </div>',
+'                <div class="panel" id="painelPerfil">',
+'                    <h3 style="font-size:15px;margin-bottom:12px"><i class="fas fa-id-badge" style="color:#00d4ff"></i> Seu perfil</h3>',
+'                    <div id="perfilDetalhes" style="font-size:13.5px;line-height:1.9"></div>',
+'                </div>',
+'                <div class="panel" id="painelImportar" style="display:none;border-color:rgba(255,193,7,.35)">',
+'                    <h3 style="font-size:15px;margin-bottom:8px"><i class="fas fa-file-import" style="color:#ffc107"></i> Importar dados antigos</h3>',
+'                    <p style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:12px">Envia agentes, PCA e fases do localStorage antigo para o banco.</p>',
+'                    <button class="btn-sair" id="btnImportarLegado" style="background:rgba(255,193,7,.15);border-color:rgba(255,193,7,.4);color:#ffc107"><i class="fas fa-play"></i> Iniciar importação</button>',
+'                    <div id="importResultado" style="margin-top:14px;font-size:13px"></div>',
+'                </div>',
+'            </main>',
+'        </div>',
+'    </div>',
+'</div>'
+].join('\n');
+
+const PARTE_SCRIPT = [
+'<script>',
+'const SUPABASE_URL = "SEU_PROJECT_URL";',
+'const SUPABASE_ANON_KEY = "SUA_ANON_KEY";',
+'const SUPABASE_CONFIGURADO = SUPABASE_URL !== "SEU_PROJECT_URL" && SUPABASE_ANON_KEY !== "SUA_ANON_KEY";',
+'let SB = null, PERFIL_ATUAL = null;',
+'',
+'function inicializarSupabase() {',
+'    if (!SUPABASE_CONFIGURADO || !window.supabase) return null;',
+'    return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {',
+'        auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:localStorage}',
+'    });',
+'}',
+'',
+'const Auth = {',
+'    async login(email, senha) {',
+'        if (!SB) throw new Error("Supabase nao configurado.");',
+'        if (!email || !senha) throw new Error("Informe email e senha.");',
+'        if (senha.length < 10) throw new Error("Senha: minimo 10 caracteres.");',
+'        const { data, error } = await SB.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: senha });',
+'        if (error) throw new Error(error.message);',
+'        await SB.from("usuarios").update({ ultimo_login: new Date().toISOString() }).eq("id", data.user.id);',
+'        return data.user;',
+'    },',
+'    async logout() {',
+'        await SB.auth.signOut();',
+'        location.reload();',
+'    },',
+'    async sessao() { if (!SB) return null; const {data} = await SB.auth.getSession(); return data && data.session ? data.session : null; },',
+'    async perfilCompleto() {',
+'        if (!SB) return null;',
+'        const { data:{ user } } = await SB.auth.getUser();',
+'        if (!user) return null;',
+'        const { data } = await SB.from("usuarios").select("id,nome_completo,email,cpf,cargo_texto,ativo,ultimo_login,cargo:cargos(nome),secretaria:secretarias(id,nome,sigla),setor:setores(id,nome,sigla),perfil:perfis(id,codigo,nome,nivel)").eq("id", user.id).single();',
+'        return data && data.ativo ? data : null;',
+'    },',
+'    async recuperarSenha(email) {',
+'        const { error } = await SB.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: location.origin + location.pathname });',
+'        if (error) throw new Error(error.message);',
+'    },',
+'    async registrar(acao, recurso, recursoId, detalhes) {',
+'        if (!SB) return;',
+'        try {',
+'            const p = await this.perfilCompleto().catch(function(){ return null; });',
+'            await SB.from("auditoria").insert({',
+'                usuario_id: p ? p.id : null, usuario_nome: p ? p.nome_completo : null,',
+'                usuario_cargo: p ? (p.cargo_texto || (p.cargo && p.cargo.nome)) : null,',
+'                usuario_secretaria: p && p.secretaria ? p.secretaria.nome : null,',
+'                usuario_setor: p && p.setor ? p.setor.nome : null,',
+'                acao, recurso, recurso_id: recursoId ? String(recursoId) : null,',
+'                detalhes: detalhes || {}, user_agent: navigator.userAgent',
+'            });',
+'        } catch(e){}',
+'    }',
+'};',
+'',
+'const RBAC = {',
+'    async temPermissao(r,a) {',
+'        if (!SB) return true;',
+'        const { data } = await SB.rpc("tem_permissao", { p_recurso:r, p_acao:a });',
+'        return !!data;',
+'    }',
+'};',
+'',
+'const MENU = [',
+'    { secao:"Inicio", itens:[ {id:"dashboard",rotulo:"Dashboard Geral",icone:"fa-chart-line"} ]},',
+'    { secao:"Processos", itens:[ {id:"lista-processos",rotulo:"Lista de Processos",icone:"fa-folder-tree"} ]},',
+'    { secao:"Administracao", itens:[',
+'        {id:"agentes",rotulo:"Agentes",icone:"fa-id-badge"},',
+'        {id:"auditoria",rotulo:"Auditoria",icone:"fa-shield-halved"}',
+'    ]}',
+'];',
+'',
+'async function iniciarShell() {',
+'    const menu = document.getElementById("menuLateral");',
+'    menu.innerHTML = MENU.map(function(g){',
+'        return "<div class=\\"menu-secao\\">" + g.secao + "</div>" +',
+'            g.itens.map(function(i){ return "<a class=\\"menu-item\\" data-id=\\"" + i.id + "\\" href=\\"#\\"><i class=\\"fas " + i.icone + "\\" style=\\"width:16px;text-align:center\\"></i><span>" + i.rotulo + "</span></a>"; }).join("");',
+'    }).join("");',
+'    menu.querySelectorAll(".menu-item").forEach(function(el){',
+'        el.addEventListener("click", function(e){',
+'            e.preventDefault();',
+'            document.querySelectorAll(".menu-item").forEach(function(x){ x.classList.remove("ativo"); });',
+'            el.classList.add("ativo");',
+'            document.getElementById("paginaTitulo").textContent = el.textContent.trim();',
+'        });',
+'    });',
+'    document.getElementById("btnSair").addEventListener("click", async function(){',
+'        if (!confirm("Deseja sair?")) return;',
+'        if (SUPABASE_CONFIGURADO) await Auth.logout();',
+'        else location.reload();',
+'    });',
+'    document.getElementById("btnMenuMobile").addEventListener("click", function(){',
+'        document.getElementById("menuLateral").classList.toggle("aberto");',
+'    });',
+'    if (PERFIL_ATUAL) {',
+'        document.getElementById("topoNome").textContent = PERFIL_ATUAL.nome_completo || "—";',
+'        document.getElementById("topoCargo").textContent = PERFIL_ATUAL.cargo_texto || (PERFIL_ATUAL.cargo && PERFIL_ATUAL.cargo.nome) || (PERFIL_ATUAL.perfil && PERFIL_ATUAL.perfil.nome) || "—";',
+'        document.getElementById("topoSecretaria").textContent = PERFIL_ATUAL.secretaria ? PERFIL_ATUAL.secretaria.nome : "—";',
+'        document.getElementById("topoSetor").textContent = PERFIL_ATUAL.setor ? PERFIL_ATUAL.setor.nome : "—";',
+'    } else {',
+'        document.getElementById("topoNome").textContent = "Modo local";',
+'        document.getElementById("topoCargo").textContent = "Sem Supabase";',
+'    }',
+'    preencherPerfil();',
+'}',
+'',
+'function preencherPerfil() {',
+'    const el = document.getElementById("perfilDetalhes");',
+'    if (!PERFIL_ATUAL) {',
+'        el.innerHTML = "<p style=\\"color:rgba(255,255,255,.5)\\">Rodando em modo local. Configure o Supabase para multiusuario.</p>";',
+'        return;',
+'    }',
+'    const linhas = [',
+'        ["Nome", PERFIL_ATUAL.nome_completo],',
+'        ["Email", PERFIL_ATUAL.email],',
+'        ["Cargo", PERFIL_ATUAL.cargo_texto || (PERFIL_ATUAL.cargo && PERFIL_ATUAL.cargo.nome) || "—"],',
+'        ["Secretaria", PERFIL_ATUAL.secretaria ? PERFIL_ATUAL.secretaria.nome : "—"],',
+'        ["Setor", PERFIL_ATUAL.setor ? PERFIL_ATUAL.setor.nome : "—"],',
+'        ["Perfil", PERFIL_ATUAL.perfil.nome + " (" + PERFIL_ATUAL.perfil.codigo + ")"],',
+'        ["Ultimo login", PERFIL_ATUAL.ultimo_login ? new Date(PERFIL_ATUAL.ultimo_login).toLocaleString("pt-BR") : "—"]',
+'    ];',
+'    el.innerHTML = linhas.map(function(l){ return "<div><span style=\\"color:rgba(255,255,255,.5)\\">" + l[0] + ":</span> <strong>" + (l[1]||"—") + "</strong></div>"; }).join("");',
+'}',
+'',
+'function configurarTelaLogin() {',
+'    const form = document.getElementById("formLogin");',
+'    const statusEl = document.getElementById("loginStatus");',
+'    const btn = document.getElementById("btnEntrar");',
+'    const btnVer = document.getElementById("btnVerSenha");',
+'    const senha = document.getElementById("loginSenha");',
+'    const email = document.getElementById("loginEmail");',
+'    function st(msg, tipo){ statusEl.className = "status-msg show " + tipo; statusEl.textContent = msg; }',
+'    btnVer.addEventListener("click", function(){ senha.type = senha.type === "password" ? "text" : "password"; });',
+'    document.getElementById("linkRecuperar").addEventListener("click", async function(e){',
+'        e.preventDefault();',
+'        const mail = prompt("Email para recuperacao:");',
+'        if (!mail) return;',
+'        try { await Auth.recuperarSenha(mail); st("Se cadastrado, voce recebera um link.", "ok"); }',
+'        catch(err){ st(err.message, "err"); }',
+'    });',
+'    form.addEventListener("submit", async function(e){',
+'        e.preventDefault();',
+'        btn.disabled = true; btn.textContent = "Entrando...";',
+'        st("Autenticando...", "info");',
+'        try {',
+'            await Auth.login(email.value.trim(), senha.value);',
+'            st("OK. Carregando...", "ok");',
+'            setTimeout(function(){ location.reload(); }, 400);',
+'        } catch(err){',
+'            st(err.message, "err");',
+'            btn.disabled = false; btn.textContent = "Entrar";',
+'        }',
+'    });',
+'}',
+'',
+'async function boot() {',
+'    SB = inicializarSupabase();',
+'    if (!SUPABASE_CONFIGURADO) {',
+'        document.getElementById("telaLogin").classList.add("oculta");',
+'        document.getElementById("shell").classList.add("ativo");',
+'        document.getElementById("faixaModoLocal").innerHTML = "<div class=\\"faixa-aviso\\"><i class=\\"fas fa-circle-info\\"></i> Rodando em <strong>modo local</strong>. Configure SUPABASE_URL e SUPABASE_ANON_KEY para multiusuario.</div>";',
+'        await iniciarShell();',
+'        return;',
+'    }',
+'    configurarTelaLogin();',
+'    const s = await Auth.sessao();',
+'    if (s) {',
+'        PERFIL_ATUAL = await Auth.perfilCompleto();',
+'        document.getElementById("telaLogin").classList.add("oculta");',
+'        document.getElementById("shell").classList.add("ativo");',
+'        await iniciarShell();',
+'    }',
+'}',
+'',
+'document.addEventListener("DOMContentLoaded", boot);',
+'</' + 'script>',
+'</body>',
+'</html>'
+].join('\n');
+
+const ARQUIVO_INDEX_HTML = PARTE_HEAD + '\n' + PARTE_BODY + '\n' + PARTE_SCRIPT;
+
+// ============================================================
+// SCHEMA SQL (compacto, sem problemas de escape)
+// ============================================================
+const ARQUIVO_SCHEMA_SQL = [
+'-- ============================================================',
+'-- SISTEMA DE LICITACOES - PALMEIRAS/BA',
+'-- SCHEMA COMPLETO (Fase 1 + Fase 2)',
+'-- Cole no SQL Editor do Supabase e clique RUN.',
+'-- ============================================================',
+'',
+'create extension if not exists "uuid-ossp";',
+'create extension if not exists "pgcrypto";',
+'',
+'create table if not exists public.secretarias (',
+'    id uuid primary key default uuid_generate_v4(),',
+'    nome text not null unique, sigla text, ativa boolean default true,',
+'    criado_em timestamptz default now(), atualizado_em timestamptz default now()',
+');',
+'',
+'create table if not exists public.setores (',
+'    id uuid primary key default uuid_generate_v4(),',
+'    secretaria_id uuid references public.secretarias(id) on delete restrict,',
+'    nome text not null, sigla text, ativo boolean default true,',
+'    criado_em timestamptz default now(), atualizado_em timestamptz default now(),',
+'    unique(secretaria_id, nome)',
+');',
+'',
+'create table if not exists public.perfis (',
+'    id uuid primary key default uuid_generate_v4(),',
+'    codigo text not null unique, nome text not null, descricao text,',
+'    nivel int default 100, criado_em timestamptz default now()',
+');',
+'',
+"insert into public.perfis (codigo, nome, descricao, nivel) values",
+"    ('master','Administrador Master','Acesso total',1),",
+"    ('admin','Administrador','Acesso administrativo',2),",
+"    ('licitacao','Setor de Licitacao','Contratacoes',15),",
+"    ('compras','Setor de Compras','Compras',15),",
+"    ('juridico','Juridico','Pareceres',15),",
+"    ('controle','Controle Interno','Analise',15),",
+"    ('contratos','Gestao de Contratos','Contratos',15),",
+"    ('secretaria','Gestor de Secretaria','Da secretaria',10),",
+"    ('setor','Usuario de Setor','Do setor',20),",
+"    ('gestor','Gestor Fiscal','Contratos proprios',25),",
+"    ('consulta','Consulta','Somente leitura',100)",
+'on conflict (codigo) do nothing;',
+'',
+'create table if not exists public.permissoes (',
+'    id uuid primary key default uuid_generate_v4(),',
+'    perfil_id uuid references public.perfis(id) on delete cascade,',
+'    recurso text not null, acao text not null,',
+'    criado_em timestamptz default now(), unique(perfil_id,recurso,acao)',
+');',
+'',
+"insert into public.permissoes (perfil_id, recurso, acao)",
+"select p.id, r.recurso, r.acao from public.perfis p",
+"cross join (values",
+"    ('usuarios','criar'),('usuarios','ler'),('usuarios','editar'),('usuarios','excluir'),",
+"    ('secretarias','criar'),('secretarias','ler'),('secretarias','editar'),",
+"    ('setores','criar'),('setores','ler'),('setores','editar'),",
+"    ('perfis','criar'),('perfis','ler'),('perfis','editar'),",
+"    ('agentes','criar'),('agentes','ler'),('agentes','editar'),",
+"    ('auditoria','ler'),",
+"    ('processos','criar'),('processos','ler'),('processos','editar'),('processos','excluir'),",
+"    ('documentos','ler'),('documentos','criar'),",
+"    ('contratos','ler'),('contratos','criar')",
+") r(recurso,acao) where p.codigo = 'master' on conflict do nothing;",
+'',
+"insert into public.permissoes (perfil_id, recurso, acao)",
+"select p.id, 'processos', 'ler' from public.perfis p where p.codigo = 'consulta'",
+'on conflict do nothing;',
+'',
+'create table if not exists public.cargos (',
+'    id uuid primary key default uuid_generate_v4(),',
+'    nome text not null unique, criado_em timestamptz default now()',
+');',
+'',
+"insert into public.cargos (nome) values",
+"    ('Agente de Contratacao'),('Pregoeiro'),('Autoridade Competente'),",
+"    ('Fiscal de Contrato'),('Gestor de Contrato'),('Membro de Equipe de Apoio'),",
+"    ('Assessor Juridico'),('Contador'),('Controlador Interno'),('Outro')",
+'on conflict (nome) do nothing;',
+'',
+'create table if not exists public.agentes (',
+'    id uuid primary key default uuid_generate_v4(),',
+'    nome text not null, funcao text not null, cpf text, cargo text, email text,',
+'    setor_id uuid references public.setores(id) on delete set null,',
+'    setor_texto text, ativo boolean default true,',
+'    criado_em timestamptz default now(), atualizado_em timestamptz default now()',
+');',
+'',
+'create table if not exists public.usuarios (',
+'    id uuid primary key references auth.users(id) on delete cascade,',
+'    nome_completo text not null, email text not null unique, cpf text,',
+'    cargo_id uuid references public.cargos(id) on delete set null,',
+'    cargo_texto text,',
+'    secretaria_id uuid references public.secretarias(id) on delete set null,',
+'    setor_id uuid references public.setores(id) on delete set null,',
+'    perfil_id uuid not null references public.perfis(id),',
+'    agente_id uuid references public.agentes(id) on delete set null,',
+'    ativo boolean default true, ultimo_login timestamptz,',
+'    criado_em timestamptz default now(), atualizado_em timestamptz default now()',
+');',
+'',
+'create table if not exists public.auditoria (',
+'    id bigserial primary key,',
+'    usuario_id uuid references public.usuarios(id) on delete set null,',
+'    usuario_nome text, usuario_cargo text, usuario_secretaria text, usuario_setor text,',
+'    acao text not null, recurso text, recurso_id text, detalhes jsonb,',
+'    ip text, user_agent text, criado_em timestamptz default now()',
+');',
+'revoke update, delete on public.auditoria from authenticated, anon, public;',
+'',
+'create table if not exists public.processos (',
+'    id uuid primary key default uuid_generate_v4(),',
+'    numero text not null, numero_curto text, ano int not null,',
+'    modalidade text, nr_modalidade text, objeto text, objeto_resumido text,',
+'    secretaria_id uuid references public.secretarias(id) on delete set null,',
+'    secretaria_texto text,',
+'    setor_atual_id uuid references public.setores(id) on delete set null,',
+'    responsavel_id uuid references public.usuarios(id) on delete set null,',
+'    status text default \'ativo\', prioridade text default \'media\',',
+'    valor_estimado numeric(15,2) default 0,',
+'    data_emissao date, data_publicacao date,',
+'    data_abertura timestamptz default now(),',
+'    origem text default \'migrado\', observacoes text,',
+'    criado_por uuid references public.usuarios(id) on delete set null,',
+'    criado_em timestamptz default now(), atualizado_em timestamptz default now(),',
+'    unique(numero, ano)',
+');',
+'',
+'create table if not exists public.tipos_documentos (',
+'    id uuid primary key default uuid_generate_v4(),',
+'    codigo text not null unique, nome text not null,',
+'    ordem int default 100, obrigatorio boolean default false,',
+'    criado_em timestamptz default now()',
+');',
+'',
+"insert into public.tipos_documentos (codigo, nome, ordem) values",
+"    ('capa','Capa',0),('dfd','DFD',1),('etp','ETP',2),('matriz','Matriz de Riscos',3),",
+"    ('pesquisa','Pesquisa de Precos',4),('mapa','Mapa Comparativo',5),('tr','TR',6),",
+"    ('edital','Edital',7),('aviso','Aviso',8),('parecer_jur','Parecer Juridico',9),",
+"    ('parecer_ci','Parecer CI',10),('sessao','Ata de Sessao',11),",
+"    ('julgamento','Julgamento',12),('homologacao','Homologacao',13),",
+"    ('contrato','Contrato',14),('aditivo','Aditivo',15),('extrato','Extrato',16),",
+"    ('publicacao','Publicacao',17),('nota_fiscal','Nota Fiscal',18),",
+"    ('relatorio','Relatorio',19),('outros','Outros',99)",
+'on conflict (codigo) do nothing;',
+'',
+'create table if not exists public.documentos (',
+'    id uuid primary key default uuid_generate_v4(),',
+'    processo_id uuid not null references public.processos(id) on delete cascade,',
+'    tipo_id uuid references public.tipos_documentos(id) on delete set null,',
+'    tipo_texto text, nome text not null, descricao text,',
+'    versao int default 1,',
+'    versao_anterior_id uuid references public.documentos(id) on delete set null,',
+'    mime_type text, tamanho_bytes bigint, hash_sha256 text,',
+'    storage_path text, storage_bucket text default \'documentos\',',
+'    url_externa text, situacao text default \'ativo\',',
+'    setor_origem_id uuid references public.setores(id) on delete set null,',
+'    enviado_por uuid references public.usuarios(id) on delete set null,',
+'    enviado_em timestamptz default now(), observacoes text,',
+'    criado_em timestamptz default now()',
+');',
+'',
+'create table if not exists public.tramitacoes (',
+'    id uuid primary key default uuid_generate_v4(),',
+'    processo_id uuid not null references public.processos(id) on delete cascade,',
+'    setor_origem_id uuid references public.setores(id) on delete set null,',
+'    setor_origem_texto text,',
+'    setor_destino_id uuid references public.setores(id) on delete set null,',
+'    setor_destino_texto text,',
+'    usuario_remetente_id uuid references public.usuarios(id) on delete set null,',
+'    usuario_destinatario_id uuid references public.usuarios(id) on delete set null,',
+'    motivo text, despacho text,',
+'    prazo_dias int, prazo_data date, prioridade text default \'media\',',
+'    status text default \'aguardando_recebimento\',',
+'    enviado_em timestamptz default now(),',
+'    recebido_em timestamptz, concluido_em timestamptz,',
+'    concluido_por uuid references public.usuarios(id) on delete set null,',
+'    observacoes_conclusao text',
+');',
+'',
+'create table if not exists public.visualizacoes (',
+'    id bigserial primary key,',
+'    documento_id uuid not null references public.documentos(id) on delete cascade,',
+'    processo_id uuid references public.processos(id) on delete cascade,',
+'    usuario_id uuid references public.usuarios(id) on delete set null,',
+'    usuario_nome text, usuario_cargo text, usuario_secretaria text, usuario_setor text,',
+'    acao text default \'visualizou\', ip text, user_agent text,',
+'    criado_em timestamptz default now()',
+');',
+'revoke update, delete on public.visualizacoes from authenticated, anon, public;',
+'',
+'create table if not exists public.fases_processos (',
+'    id uuid primary key default uuid_generate_v4(),',
+'    processo_id uuid not null references public.processos(id) on delete cascade,',
+'    etapa_codigo text not null, etapa_nome text not null,',
+'    concluida boolean default false, concluida_em timestamptz,',
+'    concluida_por uuid references public.usuarios(id) on delete set null,',
+'    ordem int default 0, observacao text,',
+'    criado_em timestamptz default now(),',
+'    unique(processo_id, etapa_codigo)',
+');',
+'',
+'create table if not exists public.prazos (',
+'    id uuid primary key default uuid_generate_v4(),',
+'    processo_id uuid not null references public.processos(id) on delete cascade,',
+'    tramitacao_id uuid references public.tramitacoes(id) on delete set null,',
+'    descricao text not null, data_limite date not null,',
+'    cumprido boolean default false, cumprido_em timestamptz,',
+'    dias_uteis boolean default true,',
+'    criado_por uuid references public.usuarios(id) on delete set null,',
+'    criado_em timestamptz default now()',
+');',
+'',
+'create table if not exists public.notificacoes (',
+'    id bigserial primary key,',
+'    usuario_id uuid not null references public.usuarios(id) on delete cascade,',
+'    tipo text not null, titulo text not null, mensagem text,',
+'    processo_id uuid references public.processos(id) on delete cascade,',
+'    documento_id uuid references public.documentos(id) on delete set null,',
+'    tramitacao_id uuid references public.tramitacoes(id) on delete set null,',
+'    lida boolean default false, criado_em timestamptz default now()',
+');',
+'',
+'create or replace function public.set_atualizado_em() returns trigger language plpgsql as $$',
+'begin new.atualizado_em = now(); return new; end; $$;',
+'',
+'create or replace function public.handle_new_user() returns trigger language plpgsql security definer as $$',
+'begin',
+'    insert into public.usuarios (id, nome_completo, email, perfil_id)',
+'    values (new.id, coalesce(new.raw_user_meta_data->>\'nome_completo\',\'Sem nome\'), new.email, (select id from public.perfis where codigo=\'consulta\'))',
+'    on conflict (id) do nothing;',
+'    return new;',
+'end; $$;',
+'',
+'drop trigger if exists on_auth_user_created on auth.users;',
+'create trigger on_auth_user_created after insert on auth.users',
+'    for each row execute function public.handle_new_user();',
+'',
+'create or replace function public.meu_perfil() returns text language sql stable security definer as $$',
+'    select p.codigo from public.usuarios u',
+'    join public.perfis p on p.id = u.perfil_id',
+'    where u.id = auth.uid() and u.ativo = true limit 1; $$;',
+'',
+'create or replace function public.tem_permissao(p_recurso text, p_acao text)',
+'returns boolean language sql stable security definer as $$',
+'    select exists (',
+'        select 1 from public.usuarios u',
+'        join public.permissoes pe on pe.perfil_id = u.perfil_id',
+'        where u.id = auth.uid() and u.ativo = true',
+'          and pe.recurso = p_recurso and pe.acao = p_acao',
+'    ); $$;',
+'',
+'alter table public.secretarias enable row level security;',
+'alter table public.setores enable row level security;',
+'alter table public.perfis enable row level security;',
+'alter table public.permissoes enable row level security;',
+'alter table public.cargos enable row level security;',
+'alter table public.agentes enable row level security;',
+'alter table public.usuarios enable row level security;',
+'alter table public.auditoria enable row level security;',
+'alter table public.processos enable row level security;',
+'alter table public.documentos enable row level security;',
+'alter table public.tramitacoes enable row level security;',
+'alter table public.visualizacoes enable row level security;',
+'alter table public.fases_processos enable row level security;',
+'alter table public.prazos enable row level security;',
+'alter table public.notificacoes enable row level security;',
+'alter table public.tipos_documentos enable row level security;',
+'',
+'drop policy if exists "leitura_secretarias" on public.secretarias;',
+'create policy "leitura_secretarias" on public.secretarias for select to authenticated using (true);',
+'',
+'drop policy if exists "leitura_setores" on public.setores;',
+'create policy "leitura_setores" on public.setores for select to authenticated using (true);',
+'',
+'drop policy if exists "leitura_perfis" on public.perfis;',
+'create policy "leitura_perfis" on public.perfis for select to authenticated using (true);',
+'',
+'drop policy if exists "leitura_permissoes" on public.permissoes;',
+'create policy "leitura_permissoes" on public.permissoes for select to authenticated using (true);',
+'',
+'drop policy if exists "leitura_cargos" on public.cargos;',
+'create policy "leitura_cargos" on public.cargos for select to authenticated using (true);',
+'',
+'drop policy if exists "leitura_agentes" on public.agentes;',
+'create policy "leitura_agentes" on public.agentes for select to authenticated using (true);',
+'drop policy if exists "escrita_agentes" on public.agentes;',
+'create policy "escrita_agentes" on public.agentes for all to authenticated using (true) with check (true);',
+'',
+'drop policy if exists "usuarios_proprio" on public.usuarios;',
+'create policy "usuarios_proprio" on public.usuarios for select to authenticated',
+'    using (id = auth.uid() or public.meu_perfil() in (\'master\',\'admin\'));',
+'',
+'drop policy if exists "auditoria_leitura" on public.auditoria;',
+'create policy "auditoria_leitura" on public.auditoria for select to authenticated',
+'    using (public.meu_perfil() in (\'master\',\'admin\',\'controle\'));',
+'drop policy if exists "auditoria_insert" on public.auditoria;',
+'create policy "auditoria_insert" on public.auditoria for insert to authenticated with check (true);',
+'',
+'drop policy if exists "processos_leitura" on public.processos;',
+'create policy "processos_leitura" on public.processos for select to authenticated using (true);',
+'drop policy if exists "processos_escrita" on public.processos;',
+'create policy "processos_escrita" on public.processos for all to authenticated using (true) with check (true);',
+'',
+'drop policy if exists "documentos_leitura" on public.documentos;',
+'create policy "documentos_leitura" on public.documentos for select to authenticated using (true);',
+'drop policy if exists "documentos_escrita" on public.documentos;',
+'create policy "documentos_escrita" on public.documentos for all to authenticated using (true) with check (true);',
+'',
+'drop policy if exists "tramitacoes_leitura" on public.tramitacoes;',
+'create policy "tramitacoes_leitura" on public.tramitacoes for select to authenticated using (true);',
+'drop policy if exists "tramitacoes_escrita" on public.tramitacoes;',
+'create policy "tramitacoes_escrita" on public.tramitacoes for all to authenticated using (true) with check (true);',
+'',
+'drop policy if exists "visualizacoes_leitura" on public.visualizacoes;',
+'create policy "visualizacoes_leitura" on public.visualizacoes for select to authenticated',
+'    using (public.meu_perfil() in (\'master\',\'admin\',\'controle\'));',
+'drop policy if exists "visualizacoes_insert" on public.visualizacoes;',
+'create policy "visualizacoes_insert" on public.visualizacoes for insert to authenticated with check (true);',
+'',
+'drop policy if exists "fases_leitura" on public.fases_processos;',
+'create policy "fases_leitura" on public.fases_processos for select to authenticated using (true);',
+'drop policy if exists "fases_escrita" on public.fases_processos;',
+'create policy "fases_escrita" on public.fases_processos for all to authenticated using (true) with check (true);',
+'',
+'drop policy if exists "prazos_leitura" on public.prazos;',
+'create policy "prazos_leitura" on public.prazos for select to authenticated using (true);',
+'drop policy if exists "prazos_escrita" on public.prazos;',
+'create policy "prazos_escrita" on public.prazos for all to authenticated using (true) with check (true);',
+'',
+'drop policy if exists "notificacoes_proprias" on public.notificacoes;',
+'create policy "notificacoes_proprias" on public.notificacoes for select to authenticated using (usuario_id = auth.uid());',
+'drop policy if exists "notificacoes_update" on public.notificacoes;',
+'create policy "notificacoes_update" on public.notificacoes for update to authenticated using (usuario_id = auth.uid()) with check (usuario_id = auth.uid());',
+'drop policy if exists "notificacoes_insert" on public.notificacoes;',
+'create policy "notificacoes_insert" on public.notificacoes for insert to authenticated with check (true);',
+'',
+'drop policy if exists "tipos_leitura" on public.tipos_documentos;',
+'create policy "tipos_leitura" on public.tipos_documentos for select to authenticated using (true);',
+'',
+"insert into public.secretarias (nome, sigla) values",
+"    ('Gabinete do Prefeito','GAB'),",
+"    ('Secretaria de Administracao','ADM'),",
+"    ('Secretaria de Financas','FIN'),",
+"    ('Secretaria de Educacao','EDU'),",
+"    ('Secretaria de Saude','SAU'),",
+"    ('Secretaria de Infraestrutura','INFRA'),",
+"    ('Secretaria de Assistencia Social','ASS'),",
+"    ('Secretaria de Cultura e Turismo','CULT'),",
+"    ('Secretaria de Meio Ambiente','MEIO'),",
+"    ('Comissao Permanente de Licitacao','CPL')",
+'on conflict (nome) do nothing;',
+'',
+"insert into public.setores (secretaria_id, nome, sigla)",
+"select id, 'Compras', 'COMPRAS' from public.secretarias where sigla='ADM'",
+'on conflict do nothing;',
+"insert into public.setores (secretaria_id, nome, sigla)",
+"select id, 'Licitacao', 'LICIT' from public.secretarias where sigla='CPL'",
+'on conflict do nothing;',
+"insert into public.setores (secretaria_id, nome, sigla)",
+"select id, 'Juridico', 'JUR' from public.secretarias where sigla='ADM'",
+'on conflict do nothing;',
+"insert into public.setores (secretaria_id, nome, sigla)",
+"select id, 'Controle Interno', 'CI' from public.secretarias where sigla='ADM'",
+'on conflict do nothing;',
+'',
+'-- FIM'
+].join('\n');
+
+const ARQUIVO_README = [
+'# Sistema de Licitacoes - Palmeiras/BA',
+'',
+'Pacote gerado com Fase 1 + Fase 2.',
+'',
+'## Conteudo',
+'- index.html - sistema completo',
+'- schema.sql - banco (PostgreSQL/Supabase)',
+'- README.md - este arquivo',
+'- PROMPT-MESTRE.md - para continuar a evolucao',
+'',
+'## 1. Testar em modo local',
+'',
+'Abra index.html no navegador. Sem Supabase configurado, roda em modo',
+'local (faixa amarela no topo). Sem login. Dados em localStorage.',
+'',
+'## 2. Ativar multiusuario (Supabase)',
+'',
+'### 2.1 Criar projeto',
+'- https://supabase.com -> New project',
+'- Regiao: South America (Sao Paulo)',
+'- Guarde a senha do banco',
+'',
+'### 2.2 Rodar schema',
+'- SQL Editor -> New query -> cole schema.sql inteiro -> Run',
+'',
+'### 2.3 Copiar credenciais',
+'- Settings -> API',
+'- Copie Project URL e anon public (NUNCA a service_role)',
+'',
+'### 2.4 Configurar no HTML',
+'Procure em index.html:',
+'  const SUPABASE_URL = "SEU_PROJECT_URL";',
+'  const SUPABASE_ANON_KEY = "SUA_ANON_KEY";',
+'Substitua pelos valores reais.',
+'',
+'### 2.5 Criar primeiro usuario Master',
+'- Authentication -> Users -> Add user',
+'- Depois, SQL Editor:',
+'  update public.usuarios',
+'  set nome_completo = \'Seu Nome\',',
+'      perfil_id = (select id from public.perfis where codigo=\'master\'),',
+'      secretaria_id = (select id from public.secretarias where sigla=\'GAB\'),',
+'      setor_id = (select id from public.setores where sigla=\'LICIT\')',
+'  where email = \'seu.email@palmeiras.ba.gov.br\';',
+'',
+'### 2.6 Servir por HTTP (obrigatorio para Supabase)',
+'- VS Code: extensao Live Server',
+'- Ou: python -m http.server 8000 (acesse http://localhost:8000)',
+'',
+'## 3. Deploy no Netlify',
+'- https://app.netlify.com/drop -> arraste a pasta',
+'- Atualize Supabase -> Authentication -> URL Configuration com a URL',
+'',
+'## 4. Proximos passos (Fase 3)',
+'- Migracao dos 280 processos (Migrador280 no console)',
+'- Listagem com filtros e paginacao',
+'- Central de notificacoes',
+'- Google Drive (OAuth via backend)',
+'- Dashboards por setor',
+'',
+'Veja PROMPT-MESTRE.md para o prompt completo.',
+'',
+'## Seguranca',
+'- Nunca coloque a service_role key no HTML',
+'- A anon public e publica por design, protegida por RLS',
+'- A chave de IA foi removida do front (decisao da Fase 1)'
+].join('\n');
+
+const ARQUIVO_PROMPT = [
+'# PROMPT-MESTRE - Evolucao do Sistema de Licitacoes Palmeiras/BA',
+'',
+'## Contexto',
+'Sistema HTML com login (Supabase), RBAC, auditoria, processos,',
+'documentos, tramitacao, fases, prazos e notificacoes.',
+'',
+'## Regras inviolaveis',
+'- Nao remover as 12 abas originais',
+'- Nao alterar nomes de funcoes globais usadas em onclick',
+'- Nao alterar chaves de localStorage sem migracao',
+'- Nao alterar formato de DADOS_REAIS',
+'- Nao alterar delimitadores dos templates .docx',
+'- Nao colocar service_role key nem IA key no front',
+'',
+'## Arquitetura',
+'- Front: HTML unico, CDN, Supabase SDK',
+'- Back: Supabase (PostgreSQL + Auth + Storage + RLS)',
+'- Deploy: Netlify',
+'',
+'## Perfis RBAC',
+'master, admin, licitacao, compras, juridico, controle,',
+'contratos, secretaria, setor, gestor, consulta',
+'',
+'## Fase 3 (proxima)',
+'1. Listagem de processos com busca, filtros e paginacao',
+'2. Central de notificacoes (sino no topo)',
+'3. Migracao de PCA e fases do localStorage para o banco',
+'4. Pagina de agentes com CRUD',
+'5. Pagina de auditoria com filtros',
+'',
+'## Fase 4',
+'1. Dashboards por setor',
+'2. Google Drive via OAuth 2.0 no backend',
+'3. Backup diario + teste de restauracao',
+'4. Icones de monitoramento (verde/amarelo/vermelho)',
+'5. Calculo de dias uteis com feriados',
+'',
+'## Fase 5',
+'1. Central de Licitacoes (PNCP, Diario Oficial)',
+'2. Assinatura eletronica (gov.br / ICP-Brasil)',
+'3. Controle de versoes de documento',
+'4. Integracao TCE-BA',
+'5. IA via backend (nunca no front)',
+'',
+'## Criterios de aceite (por fase)',
+'- Nenhuma funcao original quebrada',
+'- Dados antigos migram sem perda',
+'- Documentos .docx continuam funcionando',
+'- Modo local continua funcionando',
+'',
+'## Comando inicial sugerido',
+'"Vamos para a Fase 3. Entregue a listagem de processos com busca,',
+'filtros e paginacao, usando as tabelas ja criadas. Preserve o HTML',
+'atual. Depois entregue a central de notificacoes."'
+].join('\n');
+
+// ============================================================
+// AÇÕES DOS BOTÕES
+// ============================================================
+document.getElementById('btnGerar').addEventListener('click', function() {
+    limparLog();
+    log('Baixando 4 arquivos...', 'info');
+
+    const arquivos = [
+        ['index.html', ARQUIVO_INDEX_HTML, 'text/html;charset=utf-8'],
+        ['schema.sql', ARQUIVO_SCHEMA_SQL, 'text/plain;charset=utf-8'],
+        ['README.md', ARQUIVO_README, 'text/plain;charset=utf-8'],
+        ['PROMPT-MESTRE.md', ARQUIVO_PROMPT, 'text/plain;charset=utf-8']
+    ];
+
+    arquivos.forEach(function(arq, i) {
+        setTimeout(function() {
+            const ok = baixarArquivo(arq[0], arq[1], arq[2]);
+            if (ok) {
+                log('✅ ' + arq[0] + ' (' + (arq[1].length / 1024).toFixed(1) + ' KB)', 'ok');
+            }
+        }, i * 400);
+    });
+
+    setTimeout(function() {
+        log('---', 'info');
+        log('Pronto. Verifique a pasta de downloads.', 'info');
+        log('Se o navegador pedir permissao para multiplos downloads, autorize.', 'info');
+    }, 2000);
+});
+
+// ============================================================
+// ZIP VIA CDN (opcional, com fallback)
+// ============================================================
+document.getElementById('btnGerarZip').addEventListener('click', function() {
+    limparLog();
+    log('Carregando PizZip...', 'info');
+
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/pizzip@3.1.6/dist/pizzip.min.js';
+    script.onload = function() {
+        log('PizZip carregado. Gerando ZIP...', 'info');
+        try {
+            const zip = new window.PizZip();
+            zip.file('index.html', ARQUIVO_INDEX_HTML);
+            zip.file('schema.sql', ARQUIVO_SCHEMA_SQL);
+            zip.file('README.md', ARQUIVO_README);
+            zip.file('PROMPT-MESTRE.md', ARQUIVO_PROMPT);
+            const blob = zip.generate({ type: 'blob', compression: 'DEFLATE' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sistema-licitacoes-palmeiras.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+            log('✅ ZIP gerado! Verifique a pasta de downloads.', 'ok');
+        } catch (e) {
+            log('❌ Erro ao gerar ZIP: ' + e.message, 'err');
+            log('Use o botao de 4 arquivos como alternativa.', 'info');
+        }
+    };
+    script.onerror = function() {
+        log('❌ Falha ao carregar PizZip do CDN.', 'err');
+        log('Use o botao de 4 arquivos (nao depende de CDN).', 'info');
+    };
+    document.head.appendChild(script);
+});
+</script>
+</body>
+</html>
